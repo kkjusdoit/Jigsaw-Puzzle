@@ -185,6 +185,7 @@ namespace JigsawPuzzle.Puzzle.Core
             }
 
             state.RebuildGroups();
+            mergeResolver.ApplyAutoMerges(state, board);
 
             for (int pieceId = 0; pieceId < config.PieceCount; pieceId++)
             {
@@ -198,11 +199,6 @@ namespace JigsawPuzzle.Puzzle.Core
 
         private void ApplyMovePlan(PuzzleMovePlan movePlan)
         {
-            foreach (int displacedPieceId in movePlan.DisplacedPieceIds)
-            {
-                state.GetPiece(displacedPieceId).GroupId = displacedPieceId;
-            }
-
             foreach ((int pieceId, int targetCellIndex) in movePlan.PieceToCellAssignments)
             {
                 state.GetPiece(pieceId).CurrentCellIndex = targetCellIndex;
@@ -214,7 +210,6 @@ namespace JigsawPuzzle.Puzzle.Core
                 state.CellToPiece[piece.CurrentCellIndex] = piece.PieceId;
             }
 
-            state.RebuildGroups();
             mergeResolver.ApplyAutoMerges(state, board);
             RefreshAllPieceWorldPositions();
 
