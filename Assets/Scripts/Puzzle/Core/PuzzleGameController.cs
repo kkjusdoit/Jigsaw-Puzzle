@@ -24,6 +24,8 @@ namespace JigsawPuzzle.Puzzle.Core
         private readonly Dictionary<int, PuzzlePieceView> pieceViews = new Dictionary<int, PuzzlePieceView>();
 
         private PuzzleBoardController board;
+        private Transform boardRoot;
+        private Transform piecesRoot;
         private PuzzleState state;
         private PuzzleDragContext? activeDrag;
         private System.Random random;
@@ -134,31 +136,31 @@ namespace JigsawPuzzle.Puzzle.Core
 
         private void BuildBoard(PuzzleLevelConfig config, Sprite sprite)
         {
-            float aspect = sprite.bounds.size.x / sprite.bounds.size.y;
-            float maxBoardHeight = 7.0f;
-            float maxBoardWidth = 4.6f;
-            float boardHeight = maxBoardHeight;
-            float boardWidth = boardHeight * aspect;
-            if (boardWidth > maxBoardWidth)
+            if (boardRoot != null)
             {
-                boardWidth = maxBoardWidth;
-                boardHeight = boardWidth / aspect;
+                Destroy(boardRoot.gameObject);
             }
 
+            Vector2 boardSize = CalculateBoardSize(sprite);
             Vector3 boardCenter = new Vector3(0f, -0.45f, 0f);
-            board = new PuzzleBoardController(config.Rows, config.Columns, boardWidth, boardHeight, boardCenter);
+            board = new PuzzleBoardController(config.Rows, config.Columns, boardSize.x, boardSize.y, boardCenter);
             FitCameraToBoard();
             CreateBoardVisual();
         }
 
         private void BuildPieces(PuzzleLevelConfig config, Sprite sprite)
         {
+            if (piecesRoot != null)
+            {
+                Destroy(piecesRoot.gameObject);
+            }
+
             state = new PuzzleState();
             pieceViews.Clear();
 
             int[] arrangement = config.CreateInitialArrangement(random);
-            Transform root = new GameObject("PuzzlePieces").transform;
-            root.SetParent(transform, false);
+            piecesRoot = new GameObject("PuzzlePieces").transform;
+            piecesRoot.SetParent(transform, false);
 
             Vector2 cellSize = new Vector2(board.CellWidth, board.CellHeight);
             for (int pieceId = 0; pieceId < config.PieceCount; pieceId++)
@@ -191,7 +193,7 @@ namespace JigsawPuzzle.Puzzle.Core
             {
                 PuzzlePieceState piece = state.GetPiece(pieceId);
                 Sprite slice = slicer.CreateSlice(sprite, config.Rows, config.Columns, piece.CorrectRow, piece.CorrectColumn);
-                PuzzlePieceView view = PuzzlePieceView.Create(root, $"Piece_{pieceId:00}");
+                PuzzlePieceView view = PuzzlePieceView.Create(piecesRoot, $"Piece_{pieceId:00}");
                 view.Initialize(pieceId, slice, cellSize, config.ShowPieceIndex);
                 pieceViews.Add(pieceId, view);
             }
@@ -315,7 +317,7 @@ namespace JigsawPuzzle.Puzzle.Core
 
         private void CreateBoardVisual()
         {
-            Transform boardRoot = new GameObject("PuzzleBoard").transform;
+            boardRoot = new GameObject("PuzzleBoard").transform;
             boardRoot.SetParent(transform, false);
 
             Sprite whiteSprite = CreateSolidSprite();
@@ -391,6 +393,44 @@ namespace JigsawPuzzle.Puzzle.Core
             texture.Apply();
             texture.name = "PuzzleFallbackTexture";
             return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        private static Vector2 CalculateBoardSize(Sprite sprite)
+        {
+            const float maxBoardHeight = 7.0f;
+            const float maxBoardWidth = 4.6f;
+
+            Vector2 spritePixelSize = GetSpritePixelSize(sprite);
+            float aspect = spritePixelSize.x / spritePixelSize.y;
+
+            float boardHeight = maxBoardHeight;
+            float boardWidth = boardHeight * aspect;
+            if (boardWidth > maxBoardWidth)
+            {
+                boardWidth = maxBoardWidth;
+                boardHeight = boardWidth / aspect;
+            }
+
+            return new Vector2(boardWidth, boardHeight);
+        }
+
+        private static Vector2 GetSpritePixelSize(Sprite sprite)
+        {
+            if (sprite == null)
+            {
+                return Vector2.one;
+            }
+
+            Rect rect = sprite.rect;
+            if (rect.width > 0f && rect.height > 0f)
+            {
+                return rect.size;
+            }
+
+            Vector2 boundsSize = sprite.bounds.size;
+            return new Vector2(
+                Mathf.Max(1f, boundsSize.x * sprite.pixelsPerUnit),
+                Mathf.Max(1f, boundsSize.y * sprite.pixelsPerUnit));
         }
 
         private void OnGUI()
