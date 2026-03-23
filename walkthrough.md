@@ -1067,26 +1067,42 @@ private void ApplyMovePlan(PuzzleMovePlan movePlan)
 
 注意第 3 步放在第 4 步前面，这意味着刷新画面时，新的组关系已经生效了。
 
-### 15.1 规则问答：散块能不能顶掉组里的一块
+### 15.1 本次会话问答：group 交换与破坏
 
-这里补一个很容易在试玩时产生的疑问：
+这里把这次讨论里几个紧挨着的问题一起记下来，避免以后只记住一句结论，却忘了它背后的语义。
 
-> 一个散块，能不能替换某个已有 group 里的其中一块？如果移动成功后会破坏原有的 group，这种情况允许吗？
+问题 1：一个散块，能不能顶掉某个已有 group 里的一块？
 
-当前这份代码的答案是：允许。
+当前实现的答案是：能。
 
-精要原因有两点：
+问题 2：如果这次移动成功后，会破坏原有的 group，这种情况允许吗？
+
+当前实现的答案也是：允许。
+
+问题 3：为什么会允许？
+
+核心原因有两点：
 
 - `PuzzleSwapResolver.TryCreateMovePlan()` 只关心整组平移后占到哪些格子，以及这些格子里原本有哪些块需要被挤走。它不会检查“被挤走的块是否属于某个已有 group”，也不会保护那个 group 不被拆散。
 - `PuzzleGameController.ApplyMovePlan()` 在真正落子后，会立即调用 `PuzzleMergeResolver.ApplyAutoMerges()`，基于新的棋盘局面重新计算连通块和 `GroupId`。所以如果原来的 group 因为这次交换失去了正确邻接关系，它就会被自动打散并重分组。
+
+问题 4：这说明当前代码里的 group 本质上是什么？
+
+它不是“不可破坏的刚体”，而是“当前局面下，由正确邻接关系自动推导出来的一个整体”。也就是说，group 是重算结果，不是受绝对保护的实体。
+
+问题 5：从交互设计上看，这样做推荐吗？
+
+如果只看当前代码行为，这个规则是成立的；但如果从玩家理解成本看，这个规则未必理想。因为玩家已经被训练成“拖的是一个组”，那直觉上通常也会期待“组本身不应被外部单块轻易打散”。否则 group 既像整体，又不像整体，规则感会有一点摇摆。
+
+这也是为什么后续如果要继续迭代玩法，一个很自然的改进方向就是：
+
+- 把任何会打散已有 group 的移动直接判为 `Invalid move`。
 
 对应代码依据：
 
 - [PuzzleSwapResolver.cs](/Users/linkunkun/JigsawPuzzle/Assets/Scripts/Puzzle/Runtime/PuzzleSwapResolver.cs#L50) 到 [PuzzleSwapResolver.cs](/Users/linkunkun/JigsawPuzzle/Assets/Scripts/Puzzle/Runtime/PuzzleSwapResolver.cs#L78) 会收集 `displacedPieceIds` 并安排它们回填 `vacatedCells`，但没有判断这些块原先是否属于同一组。
 - [PuzzleGameController.cs](/Users/linkunkun/JigsawPuzzle/Assets/Scripts/Puzzle/Core/PuzzleGameController.cs#L200) 到 [PuzzleGameController.cs](/Users/linkunkun/JigsawPuzzle/Assets/Scripts/Puzzle/Core/PuzzleGameController.cs#L214) 在应用移动后直接调用 `mergeResolver.ApplyAutoMerges(...)`。
 - [PuzzleMergeResolver.cs](/Users/linkunkun/JigsawPuzzle/Assets/Scripts/Puzzle/Runtime/PuzzleMergeResolver.cs#L9) 到 [PuzzleMergeResolver.cs](/Users/linkunkun/JigsawPuzzle/Assets/Scripts/Puzzle/Runtime/PuzzleMergeResolver.cs#L29) 会按新局面重新扫描连通分量并写回新的 `GroupId`。
-
-所以，按照当前实现的真实规则，group 不是“不可破坏的刚体”；它只是“当前局面下，由正确邻接关系自动推导出的一个整体”。
 
 ### 16. 输入层：鼠标和触摸如何接进总控
 
